@@ -43,6 +43,6 @@ deploy:
     github_token: $GITHUB_TOKEN
     on:
       branch: master
-      repo: baidu/bigflow
+      #repo: baidu/bigflow
       condition: "$JOB = build_doc"
     local_dir: ./doc/html
