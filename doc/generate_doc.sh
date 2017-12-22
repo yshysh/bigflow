@@ -15,6 +15,18 @@ DATE=`date '+%Y_%m_%d_%H_%M_%S'`
 BIGFLOW_VERSION=${VERSION}_$DATE
 echo "bigflow_version = \"${BIGFLOW_VERSION}\"" > ${WORK_ROOT}/../bigflow_python/python/bigflow/version.py
 
+cd zh
 $BIGFLOW pip install sphinx
 $BIGFLOW make html
 touch _build/html/.touch _build/html/.nojekyll
+cd -
+
+rm -rf html && mkdir html
+cd html
+mv ../zh/_build/html zh
+git clone -b en_doc https://github.com/yshysh/bigflow.git
+cd bigflow
+tar zxvf en.tar.gz
+cd -
+cp -r ./bigflow/en .
+rm -rf bigflow

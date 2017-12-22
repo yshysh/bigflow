@@ -18,7 +18,7 @@ env:
 
 branches:
   only:
-    - master
+    - new_doc
 
 install:
     - echo ok
@@ -45,4 +45,4 @@ deploy:
       branch: master
       repo: baidu/bigflow
       condition: "$JOB = build_doc"
-    local_dir: ./doc/_build/html
+    local_dir: ./doc/html
