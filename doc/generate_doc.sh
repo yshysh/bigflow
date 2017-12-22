@@ -30,3 +30,4 @@ tar zxvf en.tar.gz
 cd -
 cp -r ./bigflow/en .
 rm -rf bigflow
+ls -rls
