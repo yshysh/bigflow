@@ -45,4 +45,4 @@ deploy:
       branch: master
       #repo: baidu/bigflow
       condition: "$JOB = build_doc"
-    local_dir: ./doc/html/zh
+    local_dir: ./doc/html/en
