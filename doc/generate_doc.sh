@@ -24,10 +24,10 @@ cd -
 rm -rf html && mkdir html
 cd html
 mv ../zh/_build/html zh
-git clone -b en_doc https://github.com/yshysh/bigflow.git
-cd bigflow
-tar zxvf en.tar.gz
-cd -
-cp -r ./bigflow/en .
-rm -rf bigflow
-ls -rls
+#git clone -b en_doc https://github.com/yshysh/bigflow.git
+#cd bigflow
+#tar zxvf en.tar.gz
+#cd -
+#cp -r ./bigflow/en .
+#rm -rf bigflow
+#ls -rls
