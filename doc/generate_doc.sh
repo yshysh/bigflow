@@ -31,4 +31,4 @@ mv ../zh/_build/html zh
 #cd -
 #cp -r ./bigflow/en .
 #rm -rf bigflow
-#ls -rls
+ls -rls
