@@ -18,17 +18,16 @@ echo "bigflow_version = \"${BIGFLOW_VERSION}\"" > ${WORK_ROOT}/../bigflow_python
 cd zh
 $BIGFLOW pip install sphinx
 $BIGFLOW make html
-#touch _build/html/.touch _build/html/.nojekyll
 cd -
 
 rm -rf html && mkdir html
 cd html
 touch .touch .nojekyll
 mv ../zh/_build/html zh
-#git clone -b en_doc https://github.com/yshysh/bigflow.git
-#cd bigflow
-#tar zxvf en.tar.gz
-#cd -
-#cp -r ./bigflow/en .
-#rm -rf bigflow
+git clone -b en_doc https://github.com/yshysh/bigflow.git
+cd bigflow
+tar zxf en.tar.gz
+cd -
+cp -r ./bigflow/en .
+rm -rf bigflow
 ls -rls
