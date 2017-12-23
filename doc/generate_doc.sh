@@ -18,7 +18,7 @@ echo "bigflow_version = \"${BIGFLOW_VERSION}\"" > ${WORK_ROOT}/../bigflow_python
 cd zh
 $BIGFLOW pip install sphinx
 $BIGFLOW make html
-touch _build/html/.touch _build/html/.nojekyll
+#touch _build/html/.touch _build/html/.nojekyll
 cd -
 
 rm -rf html && mkdir html
