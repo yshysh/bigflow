@@ -23,7 +23,7 @@ cd -
 
 rm -rf html && mkdir html
 cd html
-touch _build/html/.touch _build/html/.nojekyll
+touch .touch .nojekyll
 cd -
 mv ../zh/_build/html zh
 #git clone -b en_doc https://github.com/yshysh/bigflow.git
