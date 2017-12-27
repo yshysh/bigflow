@@ -2,6 +2,8 @@
 
 ### Bigflow 是什么?
 
+
+
 **Baidu Bigflow** (以下简称 Bigflow)是百度的一套计算框架， 它致力于提供一套简单易用的接口来描述用户的计算任务，并使同一套代码可以运行在不同的执行引擎之上。
 
 它的设计中有许多思想借鉴自 [Google FlumeJava](http://pages.cs.wisc.edu/~akella/CS838/F12/838-CloudPapers/FlumeJava.pdf)以及 [Google Cloud Dataflow](https://github.com/GoogleCloudPlatform/DataflowJavaSDK/)，另有部分接口设计借鉴自 [Apache Spark](http://spark.apache.org/)。
