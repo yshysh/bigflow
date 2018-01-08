@@ -8,9 +8,9 @@ git_setup() {
 copy_file() {
     chmod +x doc/locales/en/LC_MESSAGES/*.po
     chmod +x doc/locales/zh/LC_MESSAGES/*.po
-    cp -rf doc/locales/en/LC_MESSAGES/*.po ../build_doc_po_file/bigflow/doc/locales/en/LC_MESSAGES/
-    cp -rf doc/locales/zh/LC_MESSAGES/*.po ../build_doc_po_file/bigflow/doc/locales/zh/LC_MESSAGES/
-    cd ../build_doc_po_file/bigflow
+    cp -rf doc/locales/en/LC_MESSAGES/*.po /root/build_doc_po_file/bigflow/doc/locales/en/LC_MESSAGES/
+    cp -rf doc/locales/zh/LC_MESSAGES/*.po /root/build_doc_po_file/bigflow/doc/locales/zh/LC_MESSAGES/
+    cd /root/build_doc_po_file/bigflow
 }
 
 git_add() {
