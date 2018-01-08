@@ -52,6 +52,6 @@ deploy:
     github_token: $GITHUB_TOKEN
     script: chmod +x scripts/update_po_file.sh && scripts/build_doc_po_file.sh
     on:
-      branch: test
+      branch: master
       #repo: baidu/bigflow
       condition: "$JOB = build_doc_po_file"
