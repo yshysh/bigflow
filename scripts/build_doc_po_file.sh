@@ -6,7 +6,8 @@ git_setup() {
 }
 
 copy_file() {
-    cp -rf doc/locales build_doc_po_file/doc
+    cp -rf doc/locales/en/LC_MESSAGES/*.po build_doc_po_file/doc/en/LC_MESSAGES/
+    cp -rf doc/locales/zh/LC_MESSAGES/*.po build_doc_po_file/doc/zh/LC_MESSAGES/
     cd build_doc_po_file
 }
 
