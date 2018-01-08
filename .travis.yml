@@ -50,7 +50,7 @@ deploy:
   - provider: script
     skip_cleanup: true
     github_token: $GITHUB_TOKEN
-    script: chmod +x scripts/update_po_file.sh && scripts/build_doc_po_file.sh
+    script: chmod +x scripts/build_doc_po_file.sh && scripts/build_doc_po_file.sh
     on:
       branch: master
       #repo: baidu/bigflow
