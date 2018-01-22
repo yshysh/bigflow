@@ -101,4 +101,37 @@ object Utils extends Logging {
     if (merged == "") null else merged
   }
 
+
+  /**
+    *  Closable type which has close() method, this type definition is only used in `autoClose`
+    *  function
+    */
+  type Closable = ({ def close(): Any }) with AnyRef
+
+  /**
+    * AutoClose Closable resources(have close method)
+    * @param t function that generates Closable resource
+    * @param run closure that consumes resource T then produces R
+    * @tparam R return Type
+    * @tparam T resource Type, bounds to Closable
+    * @return
+    */
+  def autoClose[R, T >: Null <: Closable](t: => T)(run: T => R): R = {
+    var tt: T = null
+    try {
+      tt = t // evaluate it once
+      run(tt)
+    } finally {
+      if (tt ne null) {
+        try {
+          tt.close()
+        } catch {
+          case e: Throwable =>
+            //logInfo("Error closing resource")
+            e.printStackTrace()
+        }
+      }
+    }
+  }
+
 }

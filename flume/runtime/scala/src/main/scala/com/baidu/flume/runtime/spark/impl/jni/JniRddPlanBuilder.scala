@@ -18,8 +18,21 @@
 
 package com.baidu.flume.runtime.spark.impl.jni
 
+import java.io.{File, FileInputStream}
+
+import scala.collection.JavaConverters._
+import scala.language.postfixOps
+import scala.reflect.ClassTag
+import com.google.common.primitives.UnsignedBytes
+import org.apache.hadoop.io.BytesWritable
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
+
+import baidu.flume.Entity.PbEntity
 import baidu.flume.PhysicalPlan.{PbJob, PbSparkRDD, PbSparkTask}
 import com.baidu.flume.runtime.spark.impl.FlumePartitioner
+import com.baidu.flume.runtime.spark.impl.io.ReaderWrapper
 import com.baidu.flume.runtime.spark.impl.util.Utils
 import com.baidu.flume.runtime.spark.{Logging, RddPlanBuilder}
 import com.google.common.primitives.UnsignedBytes
@@ -66,6 +79,7 @@ class JniRddPlanBuilder extends RddPlanBuilder with Logging {
     val indexToRdd = scala.collection.mutable.Map[Int, RDD[(Array[Byte], Array[Byte])]]()
     assert(pbJob != null)
     val pbSparkJob = pbJob.getSparkJob
+    val pbEntity = JniRddPlanBuilder.loadEnvironmentFromProto()
     val indexToPbRdd = pbSparkJob.getRddList.asScala map (pbRDD => pbRDD.getRddIndex -> pbRDD) toMap
 
     def buildOrGet(pbSparkRdd: PbSparkRDD): RDD[(Array[Byte], Array[Byte])] = {
@@ -122,8 +136,11 @@ class JniRddPlanBuilder extends RddPlanBuilder with Logging {
             assert(pbSparkRdd.getTaskCount == 1, "Input Rdd can have only 1 task")
             val pbTask = pbSparkRdd.getTask(0)
             val result = create_input_rdd(pbTask)
-              .mapPartitionsWithIndex(
-                new FlumeTaskInputFunction(pbSparkJob.getJobInfo.toByteArray, pbTask.toByteArray)
+              .mapPartitionsWithIndex( {
+                 new FlumeTaskInputFunction(pbSparkJob.getJobInfo.toByteArray,
+                   pbTask.toByteArray,
+                   pbEntity.toByteArray)
+              }
               ).setName(s"BigflowRDD[${pbSparkRdd.getRddIndex}]")
             log.info(s"Partitions of input: ${result.partitions}")
             result
@@ -134,7 +151,9 @@ class JniRddPlanBuilder extends RddPlanBuilder with Logging {
                 new FlumePartitioner(pbSparkRdd.getConcurrency)
               ).setName("Shuffle")
               .mapPartitionsWithIndex(
-                new FlumeTaskGeneralFunction(pbSparkJob.getJobInfo.toByteArray, pbSparkRdd.toByteArray)
+                new FlumeTaskGeneralFunction(pbSparkJob.getJobInfo.toByteArray,
+                  pbSparkRdd.toByteArray,
+                  pbEntity.toByteArray)
               ).setName(s"BigflowRDD[${pbSparkRdd.getRddIndex}]")
 
           case PbSparkTask.Type.CACHE =>
@@ -188,5 +207,16 @@ object JniRddPlanBuilder extends Logging {
     ret
   }
 
+
+  private def loadEnvironmentFromProto(): PbEntity = {
+      val file = new File(".", "flume/environment")
+      if (file.exists()) {
+        Utils.autoClose(new FileInputStream(file)) { is =>
+          PbEntity.parseFrom(is)
+        }
+      } else {
+        null
+      }
+  }
 }
 

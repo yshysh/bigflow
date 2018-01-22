@@ -62,6 +62,8 @@ public:
             *pb_job->mutable_job_config() = *root->get<planner::JobConfig>();
         }
 
+        pb_physical_plan.mutable_environment()->CopyFrom(*root->get<planner::Environment>());
+
         return false;
     }
 };

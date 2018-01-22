@@ -18,8 +18,10 @@
 
 package com.baidu.flume.runtime.spark.impl.util
 
-import org.scalatest.FunSuite
+import java.io.{File, FileInputStream, FileNotFoundException, IOException}
 
+import org.scalatest.FunSuite
+import org.mockito.Mockito._
 /**
   * Test Suite for Utils
   *
@@ -36,6 +38,44 @@ class UtilsTest extends FunSuite {
 
   test("testDirCommonItems") {
     // nothing here...
+  }
+
+  test("autoClose function") {
+    // normal case
+    val fakeISOne = mock(classOf[FileInputStream])
+    when(fakeISOne.read()).thenReturn(1)
+    assertResult(1) {
+      Utils.autoClose(fakeISOne) { is => is.read() }
+    }
+    verify(fakeISOne).close()
+
+    // read throws exception
+    val fakeISTwo = mock(classOf[FileInputStream])
+    doThrow(new IOException).when(fakeISTwo).read()
+    intercept[IOException] {
+      Utils.autoClose(fakeISTwo) { is => is.read() }
+    }
+    verify(fakeISTwo).close()
+    verify(fakeISTwo).read()
+
+    // close throws exception
+    val fakeISThree = mock(classOf[FileInputStream])
+    doThrow(new RuntimeException).when(fakeISThree).close()
+    Utils.autoClose(fakeISThree) { _ => }
+    verify(fakeISThree).close()
+
+    // class creation throws exception
+    val fakeISFour = mock(classOf[FileInputStream])
+    def sourceFromNotExistedPath = {
+      scala.io.Source.fromFile("/path/not/exist")
+      fakeISFour
+    }
+    intercept[FileNotFoundException] {
+      Utils.autoClose(sourceFromNotExistedPath) { it =>
+        it.read()
+      }
+    }
+    verifyZeroInteractions(fakeISFour)
   }
 
 }

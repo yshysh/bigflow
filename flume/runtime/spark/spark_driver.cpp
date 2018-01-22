@@ -272,7 +272,7 @@ bool SparkDriver::start() {
     return _impl->start();
 }
 
-bool SparkDriver::run_job(const PbJob job) {
+bool SparkDriver::run_job(const PbJob& job) {
     return _impl->run_job(job);
 }
 

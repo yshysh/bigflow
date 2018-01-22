@@ -72,7 +72,8 @@ public:
     SparkBackend();
 
     // Maybe move to a Runtime class like DCE backend
-    static void LoadJobMessage(PbJob* message);
+    template<typename PbMessageType>
+    static void LoadPbMessageFromFile(const std::string& path, PbMessageType* message);
     static int32_t GetTaskIndex();
     static int64_t GetPartitionNumber();
 

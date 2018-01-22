@@ -13,7 +13,7 @@ extern "C" {
  * Signature: ([BI)J
  */
 JNIEXPORT jlong JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_00024_jniBuildTask
-  (JNIEnv *, jobject, jbyteArray, jbyteArray, jint);
+  (JNIEnv *, jobject, jbyteArray, jbyteArray, jbyteArray, jint);
 
 /*
  * Class:     com_baidu_flume_runtime_spark_impl_jni_FlumeTask__

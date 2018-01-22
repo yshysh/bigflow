@@ -84,7 +84,8 @@ bool ParseFromBytes(JNIEnv* env, jbyteArray buf, T* result) {
 }
 
 JNIEXPORT jlong JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_00024_jniBuildTask
-  (JNIEnv* env, jobject ignored, jbyteArray bytes_pb_job, jbyteArray bytes_pb_spark_task, jint partition) {
+  (JNIEnv* env, jobject ignored, jbyteArray bytes_pb_job,
+   jbyteArray bytes_pb_spark_task, jbyteArray pb_environment_bytes, jint partition) {
 
     // by miaodongdong
     if (FlumeSparkTaskEnv::setup_callback != NULL){
@@ -97,9 +98,12 @@ JNIEXPORT jlong JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_00
     baidu::flume::PbSparkJob::PbSparkJobInfo pb_job;
     CHECK(ParseFromBytes(env, bytes_pb_job, &pb_job));
 
+    baidu::flume::PbEntity pb_env;
+    CHECK(ParseFromBytes(env, pb_environment_bytes, &pb_env));
+
     try {
 
-        SparkTask* task = new SparkTask(pb_job, pb_task, /*is_use_pipe=*/false, partition);
+        SparkTask* task = new SparkTask(pb_job, pb_task, pb_env, /*is_use_pipe=*/false, partition);
 
         std::string task_attempt_id = pb_task.runtime_task_ctx().task_attempt_id();
         LOG(INFO) << "Bigflow Spark task attempt id: " << task_attempt_id;
@@ -171,13 +175,13 @@ JNIEXPORT void JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_000
    jint key_length,
    jbyteArray value,
    jint value_length) {
-    SparkTask* task = reinterpret_cast<SparkTask*>(ptr_task);
 
     char* key_bytes =
         reinterpret_cast<char*>(env->GetByteArrayElements(key, /*isCopy=*/NULL));
     char* value_bytes =
         reinterpret_cast<char*>(env->GetByteArrayElements(value, /*isCopy=*/NULL));
     try {
+        SparkTask* task = reinterpret_cast<SparkTask*>(ptr_task);
         toft::StringPiece key_piece(key_bytes, key_length);
         toft::StringPiece value_piece(value_bytes, value_length);
         task->input_executor()->process_input(key_piece, value_piece);

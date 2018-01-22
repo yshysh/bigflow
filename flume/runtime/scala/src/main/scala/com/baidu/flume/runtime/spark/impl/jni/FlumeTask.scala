@@ -18,7 +18,7 @@
 
 package com.baidu.flume.runtime.spark.impl.jni
 
-import baidu.flume.PhysicalPlan.{PbSparkRDD, PbSparkTask, PbJob, PbSparkJob}
+import baidu.flume.PhysicalPlan.{PbJob, PbSparkJob, PbSparkRDD, PbSparkTask}
 import com.baidu.flume.runtime.spark.Logging
 import com.google.common.primitives.UnsignedBytes
 import org.apache.hadoop.io.BytesWritable
@@ -55,7 +55,15 @@ class FlumeTask(val selfPtr: Long, outputSuffix: String = "Global") {
 
 object FlumeTask extends JniObject {
 
-  def buildFrom(pbSparkJobInfo: PbSparkJob.PbSparkJobInfo, pbSparkTask: PbSparkTask, partitionId: Int): FlumeTask = {
+  // todo: reconsider how we create tasks. This introduces overhead such as:
+  // 1. task serialization in Driver side
+  // 2. Protobuf deserialization and serialization in Executor's JVM side
+  // 3. JNI copy overhead
+  // 4. Protobuf deserialization in Executor's native side
+  def buildFrom(pbSparkJobInfoBytes: Array[Byte],
+                pbSparkTaskBytes: Array[Byte],
+                pbEnvironmentBytes: Array[Byte],
+                partitionId: Int): FlumeTask = {
     val suffix: String = {
       val tc = TaskContext.get()
       if (tc eq null) {
@@ -65,19 +73,26 @@ object FlumeTask extends JniObject {
       }
     }
 
+    val pbSparkTask = PbSparkTask.parseFrom(pbSparkTaskBytes)
     val taskCtxBuilder = PbSparkTask.PbRuntimeTaskContext.newBuilder().setTaskAttemptId(suffix)
-    val newPbSparkTask = PbSparkTask.newBuilder(pbSparkTask).setRuntimeTaskCtx(taskCtxBuilder).build()
+    val newPbSparkTask =
+      PbSparkTask.newBuilder(pbSparkTask).setRuntimeTaskCtx(taskCtxBuilder).build()
     val pbBytes = newPbSparkTask.toByteArray
-    new FlumeTask(jniBuildTask(pbSparkJobInfo.toByteArray, pbBytes, partitionId), suffix)
+    new FlumeTask(
+      jniBuildTask(pbSparkJobInfoBytes, pbBytes, pbEnvironmentBytes, partitionId),
+      suffix)
   }
 
   def release(flumeTask: FlumeTask): Unit = jniReleaseTask(flumeTask.selfPtr)
 
-  @native protected def jniBuildTask(pbSparkJobInfo: Array[Byte], pbSparkRDD: Array[Byte], partitionId: Int): Long
+  @native protected def jniBuildTask(pbSparkJobInfo: Array[Byte],
+                                     pbSparkRDD: Array[Byte],
+                                     pbEnvironment: Array[Byte],
+                                     partitionId: Int): Long
 
-  @native protected def jniReleaseTask(ptr: Long): Unit
+  @native protected def jniReleaseTask(selfPtr: Long): Unit
 
-  @native protected def jniGetOutputBufferPtr(ptr: Long): Long
+  @native protected def jniGetOutputBufferPtr(selfPtr: Long): Long
 
   @native protected def jniRun(selfPtr: Long, info: String): Unit
 
@@ -120,12 +135,6 @@ abstract private[jni] class FlumeTaskFunction[InputValueType, OutputValueType] e
       log.warn(s"Done releasing FlumeTask.")
     })
 
-//     TaskContext.get().addTaskCompletionListener(_ => {
-//      log.info(s"Releasing FlumeTask at ${flumeTask.selfPtr}")
-//      FlumeTask.release(flumeTask)
-//      log.info(s"Done releasing FlumeTask.")
-//    })
-
     @tailrec
     override final def hasNext: Boolean = {
       status match {
@@ -151,8 +160,6 @@ abstract private[jni] class FlumeTaskFunction[InputValueType, OutputValueType] e
             true
           } else {
             status = TaskStatus.ALL_DONE
-            // TODO(wangcong09) Release flumeTask through TaskContext callback
-            // FlumeTask.release(flumeTask)
             false
           }
         case TaskStatus.ALL_DONE =>
@@ -178,13 +185,14 @@ abstract private[jni] class FlumeTaskFunction[InputValueType, OutputValueType] e
   }
 }
 
-class FlumeTaskInputFunction(pbJobInfoBytes: Array[Byte], pbSparkTaskBytes: Array[Byte]) extends
+class FlumeTaskInputFunction(pbJobInfoBytes: Array[Byte],
+                             pbSparkTaskBytes: Array[Byte],
+                             pbEnvironment: Array[Byte]) extends
   FlumeTaskFunction[(BytesWritable, BytesWritable), (Array[Byte], Array[Byte])] {
 
   assert(pbJobInfoBytes != null)
   assert(pbSparkTaskBytes != null)
-
-  // private val emptyKey = "".getBytes()
+  assert(pbEnvironment != null)
 
   override def createIterator(partitionIndex: Int, input: Iterator[(BytesWritable, BytesWritable)]) = new
       FlumeTaskRunnerIterator(partitionIndex, input) {
@@ -197,16 +205,18 @@ class FlumeTaskInputFunction(pbJobInfoBytes: Array[Byte], pbSparkTaskBytes: Arra
         inputValue._2.getLength)
     }
 
-    override def newTask(): FlumeTask = FlumeTask.buildFrom(
-      PbSparkJob.PbSparkJobInfo.parseFrom(pbJobInfoBytes),
-      PbSparkTask.parseFrom(pbSparkTaskBytes),
+    override def newTask(): FlumeTask = FlumeTask.buildFrom(pbJobInfoBytes,
+      pbSparkTaskBytes,
+      pbEnvironment,
       // Noted: partitionIndex should be used instead of TaskContext's partitionID which represents
       // final RDD's partition rather than this RDD's parent RDD.
       partitionIndex)
   }
 }
 
-class FlumeTaskGeneralFunction(pbSparkJobInfoBytes: Array[Byte], pbSparkRDDBytes: Array[Byte]) extends
+class FlumeTaskGeneralFunction(pbSparkJobInfoBytes: Array[Byte],
+                               pbSparkRDDBytes: Array[Byte],
+                               pbEnvironment: Array[Byte]) extends
   FlumeTaskFunction[(Array[Byte], Array[Byte]), (Array[Byte], Array[Byte])] {
 
   private val comparator = UnsignedBytes.lexicographicalComparator()
@@ -226,7 +236,10 @@ class FlumeTaskGeneralFunction(pbSparkJobInfoBytes: Array[Byte], pbSparkRDDBytes
         )
         require(tasks.size == 1, s"Cannot get task from partition [$partitionIndex], RDD: " +
           s"\n$pbSparkRDD")
-        FlumeTask.buildFrom(PbSparkJob.PbSparkJobInfo.parseFrom(pbSparkJobInfoBytes), tasks.head, partitionIndex)
+        FlumeTask.buildFrom(pbSparkJobInfoBytes,
+          tasks.head.toByteArray,
+          pbEnvironment,
+          partitionIndex)
       }
 
       override def processInput(inputValue: (Array[Byte], Array[Byte])): Unit = {

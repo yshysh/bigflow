@@ -56,7 +56,7 @@ public:
 
     bool start();
 
-    bool run_job(const PbJob job);
+    bool run_job(const PbJob& job);
 
     boost::shared_ptr<KVIterator> get_cache_data(const std::string& node_id);
 

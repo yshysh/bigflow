@@ -24,6 +24,7 @@
 #include "toft/base/scoped_ptr.h"
 #include "toft/base/string/string_piece.h"
 
+#include "flume/core/environment.h"
 #include "flume/proto/physical_plan.pb.h"
 #include "flume/runtime/common/local_dataset.h"
 #include "flume/runtime/spark/spark_cache_manager.h"
@@ -33,6 +34,8 @@ namespace baidu {
 namespace flume {
 namespace runtime {
 namespace spark {
+
+using core::Environment;
 
 class InputExecutor;
 class ShuffleInputExecutor;
@@ -52,9 +55,10 @@ public:
 
 public:
     SparkTask(const PbSparkJob::PbSparkJobInfo& pb_job_info,
-            const PbSparkTask& pb_spark_task,
-            bool is_use_pipe,
-            uint32_t partition);
+              const PbSparkTask& pb_spark_task,
+              const PbEntity& pb_environment,
+              bool is_use_pipe,
+              uint32_t partition);
     ~SparkTask();
 
     bool run(const std::string& info);
@@ -76,7 +80,7 @@ private:
 private:
     bool _is_use_pipe;
     LocalDatasetManager _dataset_manager;
-    Task _task;
+    toft::scoped_ptr<Task> _task;
     PbSparkTask::Type _type;
     toft::scoped_ptr<EmitCallback> _emitter;
     toft::scoped_ptr<KVBuffer> _buffer;
@@ -85,6 +89,7 @@ private:
     bool _do_cpu_profile;
     bool _do_heap_profile;
     toft::scoped_ptr<CacheManager> _cache_manager;
+    toft::scoped_ptr<Environment> _env;
 };
 
 }  // namespace spark

@@ -25,6 +25,7 @@
 #include "gflags/gflags.h"
 #include "toft/crypto/uuid/uuid.h"
 
+#include "flume/core/entity.h"
 #include "flume/runtime/spark/input_executor.h"
 #include "flume/runtime/spark/kv_buffer.h"
 #include "flume/runtime/spark/shuffle_input_executor.h"
@@ -38,16 +39,18 @@ namespace flume {
 namespace runtime {
 namespace spark {
 
+using core::Entity;
+
 DEFINE_int32(flume_spark_task_index, -1, "id of task which to be executed");
 DEFINE_int32(flume_spark_max_memory_metabytes, 256, "max used memory size in worker side");
 DEFINE_int32(flume_spark_kvbuffer_size, 8 * 1024 * 1024, "Initial memory size of KVBuffer");
 DEFINE_string(flume_spark_partition_prefix, "", "prefix of spark partition info");
 
-SparkTask::SparkTask(
-        const PbSparkJob::PbSparkJobInfo& pb_job_info,
-        const PbSparkTask& pb_spark_task,
-        bool is_use_pipe,
-        uint32_t partition):
+SparkTask::SparkTask(const PbSparkJob::PbSparkJobInfo& pb_job_info,
+                     const PbSparkTask& pb_spark_task,
+                     const PbEntity& pb_env,
+                     bool is_use_pipe,
+                     uint32_t partition):
     _is_use_pipe(is_use_pipe),
     _type(pb_spark_task.type()),
     _do_cpu_profile(pb_spark_task.do_cpu_profile()),
@@ -74,6 +77,13 @@ SparkTask::SparkTask(
     SparkCacheManager::Emitter emit_fn = std::bind(&SparkTask::emit, this, _1, _2);
     _cache_manager.reset(new SparkCacheManager(emit_fn, pb_job_info));
 
+    Entity<Environment> entity = Entity<Environment>::From(pb_env);
+    _env.reset(entity.CreateAndSetup());
+
+    // Normally this should be executed by this->run(), however some executor requires setup before
+    // creation. For example, the python-based executor may require holding gil before creation.
+    _env->do_setup();
+
     SparkExecutorFactory factory(
             pb_spark_task,
             partition,
@@ -92,11 +102,17 @@ SparkTask::SparkTask(
             LOG(FATAL) << "Wrong type";
     }
 
-    _task.Initialize(pb_spark_task.root(), &factory);
+    _task.reset(new Task);
+    _task->Initialize(pb_spark_task.root(), &factory);
+
     factory.check_invalid();
 }
 
 SparkTask::~SparkTask() {
+    _task.reset(); // delete task before cleanup.
+    LOG(INFO) << "Do cleanup by environment";
+    _env->do_cleanup();
+    _env.reset(); // delete env
     LOG(INFO) << "Deconstructing SparkTask";
 }
 
@@ -109,7 +125,7 @@ bool SparkTask::do_heap_profile() {
 }
 
 bool SparkTask::run(const std::string& info) {
-    _task.Run(info);
+    _task->Run(info);
     return true;
 }
 
@@ -125,7 +141,7 @@ ShuffleInputExecutor* SparkTask::shuffle_input_executor() {
     if (_type == PbSparkTask::GENERAL) {
         return _shuffle_input_executor;
     } else {
-        LOG(FATAL) << "Wrong type, only GENERAL task can have HadoopInputExecutor";
+        LOG(FATAL) << "Wrong type, only GENERAL task can have ShuffleInputExecutor";
     }
 }
 

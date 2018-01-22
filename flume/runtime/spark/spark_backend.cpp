@@ -185,11 +185,23 @@ Backend::Status SparkBackend::Launch(
 
     PbPhysicalPlan physical_plan = planner.Plan(plan);
     CHECK_EQ(1, physical_plan.job_size());
+    CHECK_EQ(true, physical_plan.has_environment());
     const PbJob& pb_job = physical_plan.job(0);
 
-    std::string job_string = pb_job.SerializeAsString();
-    // plan in every new resource's flume directory
-    GetFlumeEntry(resource)->AddNormalFileFromBytes("plan", job_string.data(), job_string.length());
+    {
+        std::string job_string = pb_job.SerializeAsString();
+        // plan in every new resource's flume directory, this is only needed when committing.
+        GetFlumeEntry(resource)->AddNormalFileFromBytes("plan",
+                                                        job_string.data(),
+                                                        job_string.length());
+        std::string env_string = physical_plan.environment().SerializeAsString();
+        // environment will be only parsed by SparkDriver when constructing RDDs.
+        // Avoid parsing in executor side as it introduces disk IO.
+        // The plan and environment file is not packaged into bigflow_on_spark_application archive.
+        GetFlumeEntry(resource)->AddNormalFileFromBytes("environment",
+                                                        env_string.data(),
+                                                        env_string.length());
+    }
     _result.ok = _driver->run_job(pb_job);
 
     if (!_result.ok) {
@@ -239,7 +251,7 @@ void SparkBackend::KillJob(const std::string& reason, const std::string& detail)
 
 void SparkBackend::Execute() {
     PbJob pb_job;
-    LoadJobMessage(&pb_job);
+    LoadPbMessageFromFile("./flume/plan", &pb_job);
     const PbSparkJob& pb_spark_job = pb_job.spark_job();
 
     if (FLAGS_flume_commit) {
@@ -259,6 +271,7 @@ void SparkBackend::Execute() {
             }
         }
     } else {
+        // This branch is not used any more, will remove this in the near future
         // Run as executor when at Spark-Pipe mode
 
         PbSparkRDD pb_spark_rdd = pb_spark_job.rdd(0);
@@ -269,11 +282,15 @@ void SparkBackend::Execute() {
         // FIXME this is not correct actually, just for a raw test
         PbSparkTask pb_spark_task = pb_spark_rdd.task(task_index);
 
+        PbEntity pb_env;
+        LoadPbMessageFromFile("./flume/environment", &pb_env);
+
         int64_t partition = SparkBackend::GetPartitionNumber();
         CHECK_GE(partition, 0);
         _task.reset(new SparkTask(
                     pb_spark_job.job_info(),
                     pb_spark_task,
+                    pb_env,
                     /*is_use_pipe=*/true,
                     partition));
 
@@ -297,13 +314,14 @@ void SparkBackend::common_initialize() {
     _input_buffer.reset(new char[64 * 1024]);
 }
 
-void SparkBackend::LoadJobMessage(PbJob* message) {
+template<typename PbMessageType>
+void SparkBackend::LoadPbMessageFromFile(const std::string& path, PbMessageType* message) {
     // According comments in protobuf/io/coded_stream.h:326, 512MB will cause integer overflow in
     // protobuf
     using ::google::protobuf::io::IstreamInputStream;
     using ::google::protobuf::io::CodedInputStream;
     static const int kTotalBytesLimit = 512 * 1024 * 1024 - 1;
-    std::ifstream stream("./flume/plan", std::ios_base::binary | std::ios_base::in);
+    std::ifstream stream(path.c_str(), std::ios_base::binary | std::ios_base::in);
     IstreamInputStream raw_in(&stream);
     CodedInputStream coded_in(&raw_in);
     coded_in.SetTotalBytesLimit(kTotalBytesLimit, kTotalBytesLimit);
