@@ -22,6 +22,7 @@ import baidu.flume.PhysicalPlan.{PbSparkRDD, PbSparkTask, PbJob, PbSparkJob}
 import com.baidu.flume.runtime.spark.Logging
 import com.google.common.primitives.UnsignedBytes
 import org.apache.hadoop.io.BytesWritable
+import org.apache.spark.InterruptibleIterator
 import org.apache.spark.TaskContext
 
 import scala.annotation.tailrec
@@ -32,10 +33,10 @@ import scala.collection.JavaConverters._
   *
   * @author Wang, Cong(bigflow-opensource@baidu.com)
   */
-class FlumeTask(val selfPtr: Long, outputSuffix: String = "Global") {
+class FlumeTask(val selfPtr: Long) {
   val outputBuffer = new KVBuffer(FlumeTask.jniGetOutputBufferPtr(selfPtr))
 
-  FlumeTask.jniRun(selfPtr, outputSuffix)
+  FlumeTask.jniRun(selfPtr)
 
   def processInput(key: Array[Byte], keyLength: Int, value: Array[Byte], valueLength: Int): Unit =
     FlumeTask.jniProcessInput(selfPtr, key, keyLength, value, valueLength)
@@ -68,7 +69,7 @@ object FlumeTask extends JniObject {
     val taskCtxBuilder = PbSparkTask.PbRuntimeTaskContext.newBuilder().setTaskAttemptId(suffix)
     val newPbSparkTask = PbSparkTask.newBuilder(pbSparkTask).setRuntimeTaskCtx(taskCtxBuilder).build()
     val pbBytes = newPbSparkTask.toByteArray
-    new FlumeTask(jniBuildTask(pbSparkJobInfo.toByteArray, pbBytes, partitionId), suffix)
+    new FlumeTask(jniBuildTask(pbSparkJobInfoBytes, pbBytes, pbEnvironmentBytes, partitionId))
   }
 
   def release(flumeTask: FlumeTask): Unit = jniReleaseTask(flumeTask.selfPtr)
@@ -79,7 +80,7 @@ object FlumeTask extends JniObject {
 
   @native protected def jniGetOutputBufferPtr(ptr: Long): Long
 
-  @native protected def jniRun(selfPtr: Long, info: String): Unit
+  @native protected def jniRun(selfPtr: Long): Unit
 
   @native protected def jniProcessInput(selfPtr: Long, key: Array[Byte], keyLength: Int, value:
   Array[Byte], valueLength: Int): Unit
@@ -172,7 +173,11 @@ abstract private[jni] class FlumeTaskFunction[InputValueType, OutputValueType] e
   override def apply(partitionIndex: Int, input: Iterator[InputValueType]):
   Iterator[OutputValueType] = {
     log.info("Start running a new iterator")
-    val iterator = createIterator(partitionIndex, input)
+    // Wrap iterator with InterruptibleIterator, we are using
+    // repartitionAndSortWithinPartitions + mapPartitionWithIndex, and Spark doesn't return an
+    // InterruptibleIterator for repartitionAndSortWithinPartitions
+    val taskContext = TaskContext.get()
+    val iterator = new InterruptibleIterator(taskContext, createIterator(partitionIndex, input))
     log.info(s"Create a new $iterator, current thread: " + Thread.currentThread().getName)
     iterator
   }

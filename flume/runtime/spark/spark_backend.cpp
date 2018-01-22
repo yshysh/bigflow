@@ -277,7 +277,7 @@ void SparkBackend::Execute() {
                     /*is_use_pipe=*/true,
                     partition));
 
-        _task->run("tmp");
+        _task->run();
 
         while (fgets(_input_buffer.get(), 64 * 1024, stdin)) {
             _task->input_executor()->process_input("", _input_buffer.get());

@@ -152,14 +152,10 @@ JNIEXPORT jlong JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_00
 };
 
 JNIEXPORT void JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_00024_jniRun
-  (JNIEnv* env, jobject ignored, jlong ptr_task, jstring info) {
-
+  (JNIEnv* env, jobject ignored, jlong ptr_task) {
     try {
         SparkTask* task = reinterpret_cast<SparkTask*>(ptr_task);
-        const char* chars_info = env->GetStringUTFChars(info, /*isCopy=*/NULL);
-        CHECK_NOTNULL(chars_info);
-        task->run(chars_info);
-        env->ReleaseStringUTFChars(info, chars_info);
+        task->run();
     } CATCH_STD()
 }
 
@@ -212,6 +208,7 @@ JNIEXPORT void JNICALL Java_com_baidu_flume_runtime_spark_impl_jni_FlumeTask_000
         task->shuffle_input_executor()
             ->process_input_value(toft::StringPiece(value_bytes, value_length));
 
+>>>>>>> 706197997... blade1-44: Add _spark_task_attempt_id for SparkTask
     } CATCH_STD()
 
     env->ReleaseByteArrayElements(value, reinterpret_cast<jbyte*>(value_bytes), JNI_ABORT);

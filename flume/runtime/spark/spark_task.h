@@ -57,7 +57,7 @@ public:
             uint32_t partition);
     ~SparkTask();
 
-    bool run(const std::string& info);
+    bool run();
 
     InputExecutor* input_executor();
 
@@ -85,6 +85,8 @@ private:
     bool _do_cpu_profile;
     bool _do_heap_profile;
     toft::scoped_ptr<CacheManager> _cache_manager;
+    toft::scoped_ptr<Environment> _env;
+    std::string _spark_task_attempt_id;
 };
 
 }  // namespace spark

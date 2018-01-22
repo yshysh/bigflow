@@ -57,17 +57,19 @@ SparkTask::SparkTask(
 
     _emitter.reset(toft::NewPermanentClosure(this, &SparkTask::emit));
     // noted: Spark could execute multiple tasks in one executor under the same workspace.
-    // partition would be collided with merged tasks or speculative tasks. Use attempt_id instead
-    std::string attempt_id = pb_spark_task.runtime_task_ctx().task_attempt_id();
+    // partition would be collided with merged tasks or speculative tasks. Use
+    // _spark_task_attempt_id instead
+    _spark_task_attempt_id = pb_spark_task.runtime_task_ctx().task_attempt_id();
     // Multiple flume tasks could be executed in the same spark task. For example, cached rdd has
     // new transformation defined, normally the cached rdd would not be computed as we have cached
     // the result. However if the cache result is evicted, then spark will try to re-compute the
     // cached rdd which has flume task involved, plus new transformation(another flume task
-    // involved). To avoid collision, we append uuid to .swap.$attempt_id.
+    // involved). To avoid collision, we append uuid to .swap.$_spark_task_attempt_id.
     std::string uuid = toft::CreateCanonicalUUIDString();
-    LOG(INFO) << "Initialize with .swap, attempt id: " << attempt_id << ", uuid: " << uuid;
+    LOG(INFO) << "Initialize with .swap, attempt id: " << _spark_task_attempt_id
+              << ", uuid: " << uuid;
     _dataset_manager.Initialize(
-            ".swap." + attempt_id + "_" + uuid,
+            ".swap." + _spark_task_attempt_id + "_" + uuid,
             FLAGS_flume_spark_max_memory_metabytes * 1024 * 1024);
     using std::placeholders::_1;
     using std::placeholders::_2;
@@ -108,8 +110,8 @@ bool SparkTask::do_heap_profile() {
     return _do_heap_profile;
 }
 
-bool SparkTask::run(const std::string& info) {
-    _task.Run(info);
+bool SparkTask::run() {
+    _task->Run(_spark_task_attempt_id);
     return true;
 }
 
